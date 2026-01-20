@@ -68,7 +68,7 @@ func (r *Repository) CreateMessage(message *models.Message) error {
 	return r.db.Create(message).Error
 }
 
-func (r *Repository) GetMessageByID(chatID uint, limit int) ([]models.Message, error) {
+func (r *Repository) GetMessagesByChatID(chatID uint, limit int) ([]models.Message, error) {
 	var messages []models.Message
 
 	err := r.db.Where("chat_id = ?", chatID).

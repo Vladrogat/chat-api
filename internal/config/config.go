@@ -23,6 +23,9 @@ type ServerConfig struct {
 	Port string
 }
 
+// Load configuration
+//
+//	@return *Config
 func Load() *Config {
 	return &Config{
 		Database: DatabaseConfig{
@@ -39,6 +42,9 @@ func Load() *Config {
 	}
 }
 
+// Get connection string
+//
+//	@return string
 func (c *DatabaseConfig) DSN() string {
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
@@ -46,6 +52,11 @@ func (c *DatabaseConfig) DSN() string {
 	)
 }
 
+// get Env by key or def
+//
+//	@param key string
+//	@param defaultValue string
+//	@return string
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
