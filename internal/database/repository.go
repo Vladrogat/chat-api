@@ -1,7 +1,7 @@
 package database
 
 import (
-	"chat-api/internal/models"
+	"chat-api/internal/domain"
 	"errors"
 	"slices"
 
@@ -22,19 +22,19 @@ func NewRepository(db *gorm.DB) *Repository {
 
 // Create chat
 //
-//	@param chat *models.Chat
+//	@param chat *domain.Chat
 //	@return error
-func (r *Repository) CreateChat(chat *models.Chat) error {
+func (r *Repository) CreateChat(chat *domain.Chat) error {
 	return r.db.Create(chat).Error
 }
 
 // Get chat by ID
 //
 //	@param id uint
-//	@return *models.Chat
+//	@return *domain.Chat
 //	@return error
-func (r *Repository) GetChatByID(id uint) (*models.Chat, error) {
-	var chat models.Chat
+func (r *Repository) GetChatByID(id uint) (*domain.Chat, error) {
+	var chat domain.Chat
 	err := r.db.First(&chat, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -50,7 +50,7 @@ func (r *Repository) GetChatByID(id uint) (*models.Chat, error) {
 //	@param id uint
 //	@return error
 func (r *Repository) DeleteChat(id uint) error {
-	result := r.db.Delete(&models.Chat{}, id)
+	result := r.db.Delete(&domain.Chat{}, id)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -62,14 +62,14 @@ func (r *Repository) DeleteChat(id uint) error {
 
 // Create message
 //
-//	@param message *models.Message
+//	@param message *domain.Message
 //	@return error
-func (r *Repository) CreateMessage(message *models.Message) error {
+func (r *Repository) CreateMessage(message *domain.Message) error {
 	return r.db.Create(message).Error
 }
 
-func (r *Repository) GetMessagesByChatID(chatID uint, limit int) ([]models.Message, error) {
-	var messages []models.Message
+func (r *Repository) GetMessagesByChatID(chatID uint, limit int) ([]domain.Message, error) {
+	var messages []domain.Message
 
 	err := r.db.Where("chat_id = ?", chatID).
 		Order("created_at DESC").

@@ -2,7 +2,8 @@ package handlers
 
 import (
 	"chat-api/internal/database"
-	"chat-api/internal/models"
+	"chat-api/internal/domain"
+	"chat-api/internal/service"
 	"encoding/json"
 	"errors"
 	"log"
@@ -34,10 +35,10 @@ type CreateMessageRequest struct {
 }
 
 type GetChatResponse struct {
-	ID        uint             `json:"id"`
+	ID        int64            `json:"id"`
 	Title     string           `json:"title"`
 	CreatedAt string           `json:"created_at"`
-	Messages  []models.Message `json:"messages"`
+	Messages  []domain.Message `json:"messages"`
 }
 
 // sends a JSON response
@@ -79,14 +80,14 @@ func (h *Handler) CreateChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	title, err := models.ValidateChat(req.Title)
+	title, err := service.ValidateChat(req.Title)
 
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	chat := &models.Chat{
+	chat := &domain.Chat{
 		Title: title,
 	}
 
@@ -139,14 +140,14 @@ func (h *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	text, err := models.ValidateMessage(req.Text)
+	text, err := service.ValidateMessage(req.Text)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	message := &models.Message{
-		ChatID: uint(chatID),
+	message := &domain.Message{
+		ChatID: int64(chatID),
 		Text:   text,
 	}
 
@@ -184,7 +185,7 @@ func (h *Handler) GetChat(w http.ResponseWriter, r *http.Request) {
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		parsedLimit, err := strconv.Atoi(limitStr)
 
-		if err != nil || models.ValidateLimit(parsedLimit) != nil {
+		if err != nil || service.ValidateLimit(parsedLimit) != nil {
 			respondError(w, http.StatusBadRequest, "Limit must be between 1 and 100")
 			return
 		}
