@@ -10,6 +10,11 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// Connect to database
+//
+//	@param cfg *config.DatabaseConfig
+//	@return *gorm.DB
+//	@return error
 func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),

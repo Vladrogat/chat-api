@@ -13,8 +13,9 @@ type Repository struct {
 }
 
 // Return new repository
-// @param db *gorm.DB
-// @return *Repository
+//
+//	@param db *gorm.DB
+//	@return *Repository
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
