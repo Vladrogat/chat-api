@@ -1,25 +1,21 @@
 package handlers
 
 import (
-	"chat-api/internal/database"
-	"chat-api/internal/domain"
 	"chat-api/internal/service"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
-
-	"gorm.io/gorm"
+	"time"
 )
 
 type Handler struct {
-	repo *database.Repository
+	service *service.ChatService
 }
 
-func NewHandler(repo *database.Repository) *Handler {
-	return &Handler{repo: repo}
+func NewHandler(service *service.ChatService) *Handler {
+	return &Handler{service: service}
 }
 
 type ErrorResponse struct {
@@ -35,217 +31,147 @@ type CreateMessageRequest struct {
 }
 
 type GetChatResponse struct {
-	ID        int64            `json:"id"`
-	Title     string           `json:"title"`
-	CreatedAt string           `json:"created_at"`
-	Messages  []domain.Message `json:"messages"`
+	ID        int64       `json:"id"`
+	Title     string      `json:"title"`
+	CreatedAt string      `json:"created_at"`
+	Messages  interface{} `json:"messages"`
 }
 
-// sends a JSON response
-//
-//	@param w http.ResponseWriter
-//	@param status int
-//	@param data interface{}
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if data != nil {
-		json.NewEncoder(w).Encode(data)
+		_ = json.NewEncoder(w).Encode(data)
 	}
 }
 
-// sends an error response
-//
-//	@param w http.ResponseWriter
-//	@param status int
-//	@param message string
-func respondError(w http.ResponseWriter, status int, message string) {
-	log.Printf("Error response: %d - %s", status, message)
-	respondJSON(w, status, ErrorResponse{Error: message})
+func respondError(w http.ResponseWriter, status int, msg string) {
+	respondJSON(w, status, ErrorResponse{Error: msg})
 }
 
-// handles POST /chats/{id}/messages/
-//
-//	@param w http.ResponseWriter
-//	@param r *http.Request
+func parseChatID(r *http.Request) (int64, error) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 2 {
+		return 0, errors.New("invalid path")
+	}
+	return strconv.ParseInt(parts[1], 10, 64)
+}
+
+// POST /chats
 func (h *Handler) CreateChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		respondError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
 	var req CreateChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	title, err := service.ValidateChat(req.Title)
-
+	chat, err := h.service.CreateChat(req.Title)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	chat := &domain.Chat{
-		Title: title,
-	}
-
-	if err := h.repo.CreateChat(chat); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to create chat")
 		return
 	}
 
 	respondJSON(w, http.StatusCreated, chat)
 }
 
-// handles POST /chats/{id}/messages/
-//
-//	@param w http.ResponseWriter
-//	@param r *http.Request
+// POST /chats/{id}/messages
 func (h *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		respondError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
-	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(pathParts) < 2 {
-		respondError(w, http.StatusBadRequest, "Invalid path")
-		return
-	}
-
-	chatID, err := strconv.ParseUint(pathParts[1], 10, 32)
-
+	chatID, err := parseChatID(r)
 	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid chat ID")
-		return
-	}
-
-	chat, err := h.repo.GetChatByID(uint(chatID))
-
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to check chat")
-		return
-	}
-
-	if chat == nil {
-		respondError(w, http.StatusNotFound, "Chat not found")
+		respondError(w, http.StatusBadRequest, "invalid chat id")
 		return
 	}
 
 	var req CreateMessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	text, err := service.ValidateMessage(req.Text)
+	message, err := h.service.CreateMessage(chatID, req.Text)
 	if err != nil {
+		if errors.Is(err, service.ErrChatNotFound) {
+			respondError(w, http.StatusNotFound, "chat not found")
+			return
+		}
 		respondError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	message := &domain.Message{
-		ChatID: int64(chatID),
-		Text:   text,
-	}
-
-	if err := h.repo.CreateMessage(message); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to create message")
 		return
 	}
 
 	respondJSON(w, http.StatusCreated, message)
 }
 
-// handles GET /chats/{id}
-//
-//	@param w http.ResponseWriter
-//	@param r *http.Request
+// GET /chats/{id}?limit=N
 func (h *Handler) GetChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		respondError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
-	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(pathParts) < 2 {
-		respondError(w, http.StatusBadRequest, "Invalid path")
-		return
-	}
-
-	chatID, err := strconv.ParseUint(pathParts[1], 10, 32)
+	chatID, err := parseChatID(r)
 	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid chat ID")
+		respondError(w, http.StatusBadRequest, "invalid chat id")
 		return
 	}
 
 	limit := 20
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		parsedLimit, err := strconv.Atoi(limitStr)
-
-		if err != nil || service.ValidateLimit(parsedLimit) != nil {
-			respondError(w, http.StatusBadRequest, "Limit must be between 1 and 100")
+	if v := r.URL.Query().Get("limit"); v != "" {
+		limit, err = strconv.Atoi(v)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid limit")
 			return
 		}
-		limit = parsedLimit
 	}
 
-	chat, err := h.repo.GetChatByID(uint(chatID))
+	chat, messages, err := h.service.GetChatWithMessages(chatID, limit)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to get chat")
-		return
-	}
-	if chat == nil {
-		respondError(w, http.StatusNotFound, "Chat not found")
-		return
-	}
-
-	messages, err := h.repo.GetMessagesByChatID(uint(chatID), limit)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to get messages")
+		if errors.Is(err, service.ErrChatNotFound) {
+			respondError(w, http.StatusNotFound, "chat not found")
+			return
+		}
+		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	response := GetChatResponse{
+	resp := GetChatResponse{
 		ID:        chat.ID,
 		Title:     chat.Title,
-		CreatedAt: chat.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt: chat.CreatedAt.Format(time.RFC3339),
 		Messages:  messages,
 	}
 
-	respondJSON(w, http.StatusOK, response)
+	respondJSON(w, http.StatusOK, resp)
 }
 
-// handles DELETE /chats/{id}
-//
-//	@param w http.ResponseWriter
-//	@param r *http.Request
+// DELETE /chats/{id}
 func (h *Handler) DeleteChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		respondError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
-	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(pathParts) < 2 {
-		respondError(w, http.StatusBadRequest, "Invalid path")
-		return
-	}
-
-	chatID, err := strconv.ParseUint(pathParts[1], 10, 32)
+	chatID, err := parseChatID(r)
 	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid chat ID")
+		respondError(w, http.StatusBadRequest, "invalid chat id")
 		return
 	}
 
-	if err = h.repo.DeleteChat(uint(chatID)); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			respondError(w, http.StatusNotFound, "Chat not found")
+	if err := h.service.DeleteChat(chatID); err != nil {
+		if errors.Is(err, service.ErrChatNotFound) {
+			respondError(w, http.StatusNotFound, "chat not found")
 			return
 		}
-		respondError(w, http.StatusInternalServerError, "Failed to delete chat")
+		respondError(w, http.StatusInternalServerError, "failed to delete chat")
 		return
 	}
 

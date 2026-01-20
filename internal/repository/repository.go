@@ -1,9 +1,7 @@
-package database
+package repository
 
 import (
 	"chat-api/internal/domain"
-	"errors"
-	"slices"
 
 	"gorm.io/gorm"
 )
@@ -13,43 +11,27 @@ type Repository struct {
 }
 
 // Return new repository
-//
-//	@param db *gorm.DB
-//	@return *Repository
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
 // Create chat
-//
-//	@param chat *domain.Chat
-//	@return error
 func (r *Repository) CreateChat(chat *domain.Chat) error {
 	return r.db.Create(chat).Error
 }
 
 // Get chat by ID
-//
-//	@param id uint
-//	@return *domain.Chat
-//	@return error
-func (r *Repository) GetChatByID(id uint) (*domain.Chat, error) {
+func (r *Repository) GetChatByID(id int64) (*domain.Chat, error) {
 	var chat domain.Chat
 	err := r.db.First(&chat, id).Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	return &chat, nil
 }
 
 // Delete chat
-//
-//	@param id uint
-//	@return error
-func (r *Repository) DeleteChat(id uint) error {
+func (r *Repository) DeleteChat(id int64) error {
 	result := r.db.Delete(&domain.Chat{}, id)
 	if result.Error != nil {
 		return result.Error
@@ -61,14 +43,11 @@ func (r *Repository) DeleteChat(id uint) error {
 }
 
 // Create message
-//
-//	@param message *domain.Message
-//	@return error
 func (r *Repository) CreateMessage(message *domain.Message) error {
 	return r.db.Create(message).Error
 }
 
-func (r *Repository) GetMessagesByChatID(chatID uint, limit int) ([]domain.Message, error) {
+func (r *Repository) GetMessagesByChatID(chatID int64, limit int) ([]domain.Message, error) {
 	var messages []domain.Message
 
 	err := r.db.Where("chat_id = ?", chatID).
@@ -79,7 +58,9 @@ func (r *Repository) GetMessagesByChatID(chatID uint, limit int) ([]domain.Messa
 		return nil, err
 	}
 
-	slices.Reverse(messages)
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
 
 	return messages, nil
 }
