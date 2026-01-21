@@ -5,7 +5,20 @@ import (
 	"strings"
 )
 
+const (
+	MinChatTitleLength = 1
+	MaxChatTitleLength = 200
+
+	MinMessageLength = 1
+	MaxMessageLength = 5000
+
+	DefaultMessagesLimit = 20
+	MinMessagesLimit     = 1
+	MaxMessagesLimit     = 100
+)
+
 var (
+	ErrChatNotFound = errors.New("chat not found")
 	ErrEmptyTitle   = errors.New("title cannot be empty")
 	ErrTitleTooLong = errors.New("title must be between 1 and 200 characters")
 	ErrEmptyText    = errors.New("text cannot be empty")
@@ -14,10 +27,6 @@ var (
 )
 
 // Validates chat data
-//
-//	@param title string
-//	@return string
-//	@return error
 func ValidateChat(title string) (string, error) {
 	title = strings.TrimSpace(title)
 
@@ -25,17 +34,13 @@ func ValidateChat(title string) (string, error) {
 		return "", ErrEmptyTitle
 	}
 
-	if len(title) < 1 || len(title) > 200 {
+	if len(title) < MinChatTitleLength || len(title) > MaxChatTitleLength {
 		return "", ErrTitleTooLong
 	}
 	return title, nil
 }
 
 // Validates message data
-//
-//	@param text string
-//	@return string
-//	@return error
 func ValidateMessage(text string) (string, error) {
 	text = strings.TrimSpace(text)
 
@@ -43,7 +48,7 @@ func ValidateMessage(text string) (string, error) {
 		return "", ErrEmptyText
 	}
 
-	if len(text) < 1 || len(text) > 5000 {
+	if len(text) < MinMessageLength || len(text) > MaxMessageLength {
 		return "", ErrTextTooLong
 	}
 
@@ -51,11 +56,8 @@ func ValidateMessage(text string) (string, error) {
 }
 
 // Validates limit parameter
-//
-//	@param limit int
-//	@return error
 func ValidateLimit(limit int) error {
-	if limit < 1 || limit > 100 {
+	if limit < MinMessagesLimit || limit > MaxMessagesLimit {
 		return ErrInvalidLimit
 	}
 

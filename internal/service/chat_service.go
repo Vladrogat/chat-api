@@ -8,10 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-var (
-	ErrChatNotFound = errors.New("chat not found")
-)
-
 type ChatService struct {
 	repo *repository.Repository
 }
@@ -66,6 +62,10 @@ func (s *ChatService) CreateMessage(chatID int64, text string) (*domain.Message,
 
 // GetChatWithMessages returns chat with last N messages
 func (s *ChatService) GetChatWithMessages(chatID int64, limit int) (*domain.Chat, []domain.Message, error) {
+	if limit == 0 {
+		limit = DefaultMessagesLimit
+	}
+
 	if err := ValidateLimit(limit); err != nil {
 		return nil, nil, err
 	}

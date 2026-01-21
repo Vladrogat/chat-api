@@ -124,7 +124,7 @@ func (h *Handler) GetChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := 20
+	var limit int
 	if v := r.URL.Query().Get("limit"); v != "" {
 		limit, err = strconv.Atoi(v)
 		if err != nil {
